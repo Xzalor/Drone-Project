@@ -3,7 +3,8 @@
 
 #include <config.h>
 #include <VP_Api/vp_api_thread_helper.h>
-
+#include "cv.h"
+#include "highgui.h" // if you want to display images with OpenCV functions
 
 PROTO_THREAD_ROUTINE(video_stage, data);
 

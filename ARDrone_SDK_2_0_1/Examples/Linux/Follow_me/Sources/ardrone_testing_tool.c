@@ -3,6 +3,7 @@
  * @author sylvain.gaeremynck@parrot.com
  * @date 2009/07/01
  */
+
 #include <ardrone_testing_tool.h>
 
 //ARDroneLib
@@ -23,23 +24,40 @@
 
 //Local project
 #include <Video/video_stage.h>
+#include "UI/gui.h"
+
+DEFINE_THREAD_ROUTINE(gui, data) /* gui is the routine's name */
+{
+  gdk_threads_enter();
+  gtk_main();
+  gdk_threads_leave();
+}
 
 static int32_t exit_ihm_program = 1;
+int argc_cpy;
+char** argv_cpy;
+
 
 /* Implementing Custom methods for the main function of an ARDrone application */
 int main(int argc, char** argv)
 {
-	return ardrone_tool_main(argc, argv);
+  argc_cpy=argc; //Rajout pour ardrone_tool_init_cystom problem
+  argv_cpy=argv;
+
+  return ardrone_tool_main(argc, argv);
 }
 
 /* The delegate object calls this method during initialization of an ARDrone application */
-C_RESULT ardrone_tool_init_custom(void)
+C_RESULT ardrone_tool_init_custom()
 {
   /* Registering for a new device of game controller */
   // ardrone_tool_input_add( &gamepad );
 
   /* Start all threads of your application */
   START_THREAD( video_stage, NULL );
+  
+  init_gui(argc_cpy, argv_cpy); /* Creating the GUI */
+  START_THREAD(gui, NULL); /* Starting the GUI thread */ 
   
   return C_OK;
 }
@@ -49,7 +67,8 @@ C_RESULT ardrone_tool_shutdown_custom(void)
 {
   /* Relinquish all threads of your application */
   JOIN_THREAD( video_stage );
-
+  
+  JOIN_THREAD( gui );
   /* Unregistering for the current device */
   // ardrone_tool_input_remove( &gamepad );
 
@@ -74,5 +93,6 @@ BEGIN_THREAD_TABLE
   THREAD_TABLE_ENTRY( ardrone_control, 20 )
   THREAD_TABLE_ENTRY( navdata_update, 20 )
   THREAD_TABLE_ENTRY( video_stage, 20 )
+  THREAD_TABLE_ENTRY(gui, 20)
 END_THREAD_TABLE
 

@@ -35,6 +35,9 @@
 #include <ardrone_tool/ardrone_tool.h>
 #include <ardrone_tool/Com/config_com.h>
 
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#include "../UI/gui.h"
+
 #ifndef RECORD_VIDEO
 #define RECORD_VIDEO
 #endif
@@ -53,22 +56,74 @@ PIPELINE_HANDLE pipeline_handle;
 static uint8_t*  pixbuf_data       = NULL;
 static vp_os_mutex_t  video_update_lock = PTHREAD_MUTEX_INITIALIZER;
 
-C_RESULT output_gtk_stage_open( void *cfg, vp_api_io_data_t *in, vp_api_io_data_t *out)
+IplImage *ipl_image_from_data(uint8_t* data)
 {
-  return (SUCCESS);
+  IplImage *currframe;
+  IplImage *dst;
+ 
+  currframe = cvCreateImage(cvSize(320,240), IPL_DEPTH_8U, 3);
+  dst = cvCreateImage(cvSize(320,240), IPL_DEPTH_8U, 3);
+ 
+  currframe->imageData = data;
+  cvCvtColor(currframe, dst, CV_BGR2RGB);
+  cvReleaseImage(&currframe);
+  return dst;
 }
 
 C_RESULT output_gtk_stage_transform( void *cfg, vp_api_io_data_t *in, vp_api_io_data_t *out)
 {
   vp_os_mutex_lock(&video_update_lock);
- 
-  /* Get a reference to the last decoded picture */
+  // Get a reference to the last decoded picture
   pixbuf_data      = (uint8_t*)in->buffers[0];
-
   vp_os_mutex_unlock(&video_update_lock);
+ 
+  gdk_threads_enter();
+  // GdkPixbuf structure to store the displayed picture
+  static GdkPixbuf *pixbuf = NULL;
+ 
+  if(pixbuf!=NULL)
+    {
+      g_object_unref(pixbuf);
+      pixbuf=NULL;
+    }
+ 
+  // Creating the GdkPixbuf from the transmited data
+  pixbuf = gdk_pixbuf_new_from_data(pixbuf_data,
+                    GDK_COLORSPACE_RGB,
+                    FALSE,   // No alpha channel
+                    8,       // 8 bits per pixel
+                    320,     // Image width
+                    288,     // Image height
+                    320 * 3, // New pixel every 3 bytes (3channel per pixel)
+                    NULL,    // Function pointers
+                    NULL);
+ 
+  gui_t *gui = get_gui();
+  if (gui && gui->cam) // Displaying the image
+    gtk_image_set_from_pixbuf(GTK_IMAGE(gui->cam), pixbuf);
+  gdk_threads_leave();
+ 
+  IplImage *img = ipl_image_from_data((uint8_t*)in->buffers[0]);
 
   return (SUCCESS);
 }
+
+C_RESULT output_gtk_stage_open( void *cfg, vp_api_io_data_t *in, vp_api_io_data_t *out)
+{
+  return (SUCCESS);
+}
+
+//C_RESULT output_gtk_stage_transform( void *cfg, vp_api_io_data_t *in, vp_api_io_data_t *out)
+//{
+// vp_os_mutex_lock(&video_update_lock);
+ 
+  /* Get a reference to the last decoded picture */
+//  pixbuf_data      = (uint8_t*)in->buffers[0];
+
+//  vp_os_mutex_unlock(&video_update_lock);
+
+//  return (SUCCESS);
+//}
 
 C_RESULT output_gtk_stage_close( void *cfg, vp_api_io_data_t *in, vp_api_io_data_t *out)
 {
